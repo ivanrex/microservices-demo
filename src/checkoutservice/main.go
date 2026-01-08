@@ -232,15 +232,26 @@ func (cs *checkoutService) Watch(req *healthpb.HealthCheckRequest, ws healthpb.H
 func (cs *checkoutService) PlaceOrder(ctx context.Context, req *pb.PlaceOrderRequest) (*pb.PlaceOrderResponse, error) {
 	reqLog := logForRequest(ctx)
 	reqLog.Infof("[PlaceOrder] user_id=%q user_currency=%q", req.UserId, req.UserCurrency)
+	businessEventLogger(reqLog, "place_order_received", "place_order", "order", "place_order", "success", logrus.Fields{
+		"user_id":  req.UserId,
+		"currency": req.UserCurrency,
+	}).Info("place order received")
 
 	orderID, err := uuid.NewUUID()
 	if err != nil {
+		businessEventLogger(reqLog, "place_order_received", "place_order", "order", "place_order", "failure", logrus.Fields{
+			"user_id": req.UserId,
+		}).WithField("error", err).Warn("place order failed to generate order id")
 		return nil, status.Errorf(codes.Internal, "failed to generate order uuid")
 	}
 
 	prep, err := cs.prepareOrderItemsAndShippingQuoteFromCart(ctx, req.UserId, req.UserCurrency, req.Address)
 	if err != nil {
-		return nil, status.Errorf(codes.Internal, err.Error())
+		businessEventLogger(reqLog, "place_order_received", "place_order", "order", "place_order", "failure", logrus.Fields{
+			"user_id":  req.UserId,
+			"order_id": orderID.String(),
+		}).WithField("error", err).Warn("place order preparation failed")
+		return nil, status.Errorf(codes.Internal, "%s", err.Error())
 	}
 
 	total := pb.Money{CurrencyCode: req.UserCurrency,
@@ -254,16 +265,39 @@ func (cs *checkoutService) PlaceOrder(ctx context.Context, req *pb.PlaceOrderReq
 
 	txID, err := cs.chargeCard(ctx, &total, req.CreditCard)
 	if err != nil {
+		businessEventLogger(reqLog, "payment_authorized", "charge_card", "payment", "place_order", "failure", logrus.Fields{
+			"order_id": orderID.String(),
+			"user_id":  req.UserId,
+		}).WithField("error", err).Warn("payment authorization failed")
 		return nil, status.Errorf(codes.Internal, "failed to charge card: %+v", err)
 	}
 	reqLog.Infof("payment went through (transaction_id: %s)", txID)
+	businessEventLogger(reqLog, "payment_authorized", "charge_card", "payment", "place_order", "success", logrus.Fields{
+		"order_id":       orderID.String(),
+		"user_id":        req.UserId,
+		"payment_txn_id": txID,
+	}).Info("payment authorized")
 
 	shippingTrackingID, err := cs.shipOrder(ctx, req.Address, prep.cartItems)
 	if err != nil {
+		businessEventLogger(reqLog, "order_created", "create_order", "order", "place_order", "failure", logrus.Fields{
+			"order_id": orderID.String(),
+			"user_id":  req.UserId,
+		}).WithField("error", err).Warn("order shipment failed")
 		return nil, status.Errorf(codes.Unavailable, "shipping error: %+v", err)
 	}
 
-	_ = cs.emptyUserCart(ctx, req.UserId)
+	if err := cs.emptyUserCart(ctx, req.UserId); err != nil {
+		businessEventLogger(reqLog, "cart_emptied", "empty_cart", "cart", "place_order", "failure", logrus.Fields{
+			"order_id": orderID.String(),
+			"user_id":  req.UserId,
+		}).WithField("error", err).Warn("cart empty failed")
+	} else {
+		businessEventLogger(reqLog, "cart_emptied", "empty_cart", "cart", "place_order", "success", logrus.Fields{
+			"order_id": orderID.String(),
+			"user_id":  req.UserId,
+		}).Info("cart emptied")
+	}
 
 	orderResult := &pb.OrderResult{
 		OrderId:            orderID.String(),
@@ -272,11 +306,26 @@ func (cs *checkoutService) PlaceOrder(ctx context.Context, req *pb.PlaceOrderReq
 		ShippingAddress:    req.Address,
 		Items:              prep.orderItems,
 	}
+	businessEventLogger(reqLog, "order_created", "create_order", "order", "place_order", "success", logrus.Fields{
+		"order_id":             orderResult.GetOrderId(),
+		"shipping_tracking_id": shippingTrackingID,
+		"user_id":              req.UserId,
+	}).Info("order created")
 
 	if err := cs.sendOrderConfirmation(ctx, req.Email, orderResult); err != nil {
 		reqLog.Warnf("failed to send order confirmation to %q: %+v", req.Email, err)
+		businessEventLogger(reqLog, "confirmation_email_sent", "send_order_confirmation_email", "order", "place_order", "failure", logrus.Fields{
+			"order_id": orderResult.GetOrderId(),
+			"user_id":  req.UserId,
+			"email":    req.Email,
+		}).WithField("error", err).Warn("order confirmation email failed")
 	} else {
 		reqLog.Infof("order confirmation email sent to %q", req.Email)
+		businessEventLogger(reqLog, "confirmation_email_sent", "send_order_confirmation_email", "order", "place_order", "success", logrus.Fields{
+			"order_id": orderResult.GetOrderId(),
+			"user_id":  req.UserId,
+			"email":    req.Email,
+		}).Info("order confirmation email sent")
 	}
 	resp := &pb.PlaceOrderResponse{Order: orderResult}
 	return resp, nil
