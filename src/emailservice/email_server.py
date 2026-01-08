@@ -40,6 +40,7 @@ from opentelemetry.exporter.otlp.proto.grpc.trace_exporter import OTLPSpanExport
 # import googlecloudprofiler
 
 from logger import getJSONLogger
+from logging_context import set_correlation_from_context
 logger = getJSONLogger('emailservice-server')
 
 # Loads confirmation email template from file
@@ -84,6 +85,7 @@ class EmailService(BaseEmailService):
     logger.info("Message sent: {}".format(response.rfc822_message_id))
 
   def SendOrderConfirmation(self, request, context):
+    set_correlation_from_context(context)
     email = request.email
     order = request.order
 
@@ -107,6 +109,7 @@ class EmailService(BaseEmailService):
 
 class DummyEmailService(BaseEmailService):
   def SendOrderConfirmation(self, request, context):
+    set_correlation_from_context(context)
     logger.info('A request to send order confirmation email to {} has been received.'.format(request.email))
     return demo_pb2.Empty()
 

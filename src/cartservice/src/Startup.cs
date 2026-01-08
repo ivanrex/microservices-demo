@@ -56,7 +56,11 @@ namespace cartservice
             }
 
 
-            services.AddGrpc();
+            services.AddSingleton<CorrelationIdInterceptor>();
+            services.AddGrpc(options =>
+            {
+                options.Interceptors.Add<CorrelationIdInterceptor>();
+            });
         }
 
         // This method gets called by the runtime. Use this method to configure the HTTP request pipeline.

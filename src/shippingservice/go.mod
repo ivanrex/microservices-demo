@@ -6,6 +6,7 @@ toolchain go1.25.5
 
 require (
 	cloud.google.com/go/profiler v0.4.3
+	github.com/google/uuid v1.6.0
 	github.com/sirupsen/logrus v1.9.3
 	golang.org/x/net v0.48.0
 	google.golang.org/grpc v1.78.0

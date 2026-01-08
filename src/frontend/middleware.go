@@ -26,6 +26,7 @@ import (
 
 type ctxKeyLog struct{}
 type ctxKeyRequestID struct{}
+type ctxKeyUserID struct{}
 
 type logHandler struct {
 	log  *logrus.Logger
@@ -56,19 +57,31 @@ func (r *responseRecorder) WriteHeader(statusCode int) {
 
 func (lh *logHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
-	requestID, _ := uuid.NewRandom()
-	ctx = context.WithValue(ctx, ctxKeyRequestID{}, requestID.String())
+	requestID := r.Header.Get(headerRequestID)
+	if requestID == "" {
+		requestUUID, _ := uuid.NewRandom()
+		requestID = requestUUID.String()
+	}
+	w.Header().Set(headerRequestID, requestID)
+
+	info := correlationFromContext(ctx)
+	info.RequestID = requestID
+	ctx = contextWithCorrelation(ctx, info)
 
 	start := time.Now()
 	rr := &responseRecorder{w: w}
-	log := lh.log.WithFields(logrus.Fields{
+	fields := logrus.Fields{
 		"http.req.path":   r.URL.Path,
 		"http.req.method": r.Method,
-		"http.req.id":     requestID.String(),
-	})
-	if v, ok := r.Context().Value(ctxKeySessionID{}).(string); ok {
-		log = log.WithField("session", v)
+		"http.req.id":     requestID,
 	}
+	for key, value := range logFieldsFromContext(ctx) {
+		fields[key] = value
+	}
+	if v, ok := r.Context().Value(ctxKeySessionID{}).(string); ok {
+		fields["session"] = v
+	}
+	log := lh.log.WithFields(fields)
 	log.Debug("request started")
 	defer func() {
 		log.WithFields(logrus.Fields{
@@ -105,6 +118,7 @@ func ensureSessionID(next http.Handler) http.HandlerFunc {
 			sessionID = c.Value
 		}
 		ctx := context.WithValue(r.Context(), ctxKeySessionID{}, sessionID)
+		ctx = context.WithValue(ctx, ctxKeyUserID{}, sessionID)
 		r = r.WithContext(ctx)
 		next.ServeHTTP(w, r)
 	}

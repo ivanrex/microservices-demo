@@ -18,6 +18,8 @@ import logging
 import sys
 from pythonjsonlogger import jsonlogger
 
+from logging_context import CorrelationFilter
+
 # TODO(yoshifumi) this class is duplicated since other Python services are
 # not sharing the modules for logging.
 class CustomJsonFormatter(jsonlogger.JsonFormatter):
@@ -35,6 +37,7 @@ def getJSONLogger(name):
   handler = logging.StreamHandler(sys.stdout)
   formatter = CustomJsonFormatter('%(timestamp)s %(severity)s %(name)s %(message)s')
   handler.setFormatter(formatter)
+  handler.addFilter(CorrelationFilter())
   logger.addHandler(handler)
   logger.setLevel(logging.INFO)
   logger.propagate = False

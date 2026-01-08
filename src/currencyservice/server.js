@@ -14,16 +14,8 @@
  * limitations under the License.
  */
 
-const pino = require('pino');
-const logger = pino({
-  name: 'currencyservice-server',
-  messageKey: 'message',
-  formatters: {
-    level (logLevelString, logLevelNum) {
-      return { severity: logLevelString }
-    }
-  }
-});
+const { baseLogger, loggerForCall } = require('./logging');
+const logger = baseLogger;
 
 if(process.env.DISABLE_PROFILER) {
   logger.info("Profiler disabled.")
@@ -126,7 +118,8 @@ function _carry (amount) {
  * Lists the supported currencies
  */
 function getSupportedCurrencies (call, callback) {
-  logger.info('Getting supported currencies...');
+  const reqLogger = loggerForCall(call);
+  reqLogger.info('Getting supported currencies...');
   _getCurrencyData((data) => {
     callback(null, {currency_codes: Object.keys(data)});
   });
@@ -136,6 +129,7 @@ function getSupportedCurrencies (call, callback) {
  * Converts between currencies
  */
 function convert (call, callback) {
+  const reqLogger = loggerForCall(call);
   try {
     _getCurrencyData((data) => {
       const request = call.request;
@@ -159,11 +153,11 @@ function convert (call, callback) {
       result.nanos = Math.floor(result.nanos);
       result.currency_code = request.to_code;
 
-      logger.info(`conversion request successful`);
+      reqLogger.info(`conversion request successful`);
       callback(null, result);
     });
   } catch (err) {
-    logger.error(`conversion request failed: ${err}`);
+    reqLogger.error(`conversion request failed: ${err}`);
     callback(err.message);
   }
 }
