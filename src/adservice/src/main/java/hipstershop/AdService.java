@@ -97,6 +97,8 @@ public final class AdService {
       try {
         List<Ad> allAds = new ArrayList<>();
         logger.info("received ad request (context_words=" + req.getContextKeysList() + ")");
+        logger.info(
+            "event=ad_request_received service=adservice component=grpc action=get_ads entity=ad reason=get_ads outcome=success");
         if (req.getContextKeysCount() > 0) {
           for (int i = 0; i < req.getContextKeysCount(); i++) {
             Collection<Ad> ads = service.getAdsByCategory(req.getContextKeys(i));
@@ -110,10 +112,15 @@ public final class AdService {
           allAds = service.getRandomAds();
         }
         AdResponse reply = AdResponse.newBuilder().addAllAds(allAds).build();
+        logger.info(
+            "event=ads_selected service=adservice component=grpc action=get_ads entity=ad reason=get_ads outcome=success ads_count="
+                + allAds.size());
         responseObserver.onNext(reply);
         responseObserver.onCompleted();
       } catch (StatusRuntimeException e) {
         logger.log(Level.WARN, "GetAds Failed with status {}", e.getStatus());
+        logger.warn(
+            "event=ads_error service=adservice component=grpc action=get_ads entity=ad reason=get_ads outcome=failure");
         responseObserver.onError(e);
       }
     }
