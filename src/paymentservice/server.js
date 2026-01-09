@@ -54,8 +54,14 @@ class HipsterShopServer {
         amount_currency: amount ? amount.currency_code : undefined,
         amount_units: amount ? amount.units : undefined
       }).info('payment charge succeeded');
+      businessEventLogger(reqLogger, 'payment_txn_recorded', 'record_transaction', 'payment', 'charge', 'success', {
+        payment_txn_id: response.transaction_id
+      }).info('payment transaction recorded');
       callback(null, response);
     } catch (err) {
+      businessEventLogger(reqLogger, 'payment_validation_failed', 'validate_card', 'payment', 'charge', 'failure', {
+        error: err.message || String(err)
+      }).warn({ err }, 'payment validation failed');
       businessEventLogger(reqLogger, 'payment_charge_failed', 'charge_card', 'payment', 'charge', 'failure', {
         amount_currency: amount ? amount.currency_code : undefined,
         amount_units: amount ? amount.units : undefined

@@ -169,6 +169,9 @@ func (s *server) ShipOrder(ctx context.Context, in *pb.ShipOrderRequest) (*pb.Sh
 		"tracking_id": resp.TrackingId,
 		"items_count": len(in.Items),
 	}).Info("shipment created")
+	businessEventLogger(reqLog, "ship_order_completed", "ship_order", "shipment", "ship_order", "success", logrus.Fields{
+		"tracking_id": resp.TrackingId,
+	}).Info("ship order completed")
 	return resp, nil
 }
 

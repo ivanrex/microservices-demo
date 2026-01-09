@@ -109,6 +109,8 @@ public final class AdService {
         }
         if (allAds.isEmpty()) {
           // Serve random ads.
+          logger.info(
+              "event=ads_empty service=adservice component=grpc action=get_ads entity=ad reason=get_ads outcome=success");
           allAds = service.getRandomAds();
         }
         AdResponse reply = AdResponse.newBuilder().addAllAds(allAds).build();
@@ -117,6 +119,9 @@ public final class AdService {
                 + allAds.size());
         responseObserver.onNext(reply);
         responseObserver.onCompleted();
+        logger.info(
+            "event=ads_served service=adservice component=grpc action=get_ads entity=ad reason=get_ads outcome=success ads_count="
+                + allAds.size());
       } catch (StatusRuntimeException e) {
         logger.log(Level.WARN, "GetAds Failed with status {}", e.getStatus());
         logger.warn(

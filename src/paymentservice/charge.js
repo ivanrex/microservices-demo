@@ -15,6 +15,7 @@
 const cardValidator = require('simple-card-validator');
 const { v4: uuidv4 } = require('uuid');
 const baseLogger = require('./logger');
+const { businessEventLogger } = require('./events');
 
 
 class CreditCardError extends Error {
@@ -69,6 +70,10 @@ module.exports = function charge (request, logger) {
   const currentYear = new Date().getFullYear();
   const { credit_card_expiration_year: year, credit_card_expiration_month: month } = creditCard;
   if ((currentYear * 12 + currentMonth) > (year * 12 + month)) { throw new ExpiredCreditCard(cardNumber.replace('-', ''), month, year); }
+
+  businessEventLogger(reqLogger, 'payment_validated', 'validate_card', 'payment', 'charge', 'success', {
+    card_type: cardType
+  }).info('payment validated');
 
   reqLogger.info(`Transaction processed: ${cardType} ending ${cardNumber.substr(-4)} \
     Amount: ${amount.currency_code}${amount.units}.${amount.nanos}`);

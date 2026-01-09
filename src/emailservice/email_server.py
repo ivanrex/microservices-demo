@@ -112,6 +112,11 @@ class EmailService(BaseEmailService):
       return demo_pb2.Empty()
 
     try:
+      logger.info(
+        "event=email_send_attempt service=emailservice component=grpc "
+        "action=send_order_confirmation entity=email reason=send_order_confirmation outcome=success "
+        f"order_id={order.order_id} email={email}"
+      )
       EmailService.send_email(self.client, email, confirmation)
     except GoogleAPICallError as err:
       context.set_details("An error occurred when sending the email.")
@@ -136,6 +141,11 @@ class DummyEmailService(BaseEmailService):
     logger.info('A request to send order confirmation email to {} has been received.'.format(request.email))
     logger.info(
       "event=email_send_requested service=emailservice component=grpc "
+      "action=send_order_confirmation entity=email reason=send_order_confirmation outcome=success "
+      f"order_id={request.order.order_id} email={request.email}"
+    )
+    logger.info(
+      "event=email_send_attempt service=emailservice component=grpc "
       "action=send_order_confirmation entity=email reason=send_order_confirmation outcome=success "
       f"order_id={request.order.order_id} email={request.email}"
     )
