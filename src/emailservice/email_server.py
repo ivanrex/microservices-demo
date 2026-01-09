@@ -88,12 +88,26 @@ class EmailService(BaseEmailService):
     set_correlation_from_context(context)
     email = request.email
     order = request.order
+    logger.info(
+      "event=email_send_requested service=emailservice component=grpc "
+      "action=send_order_confirmation entity=email reason=send_order_confirmation outcome=success "
+      f"order_id={order.order_id} email={email}"
+    )
 
     try:
       confirmation = template.render(order = order)
+      logger.info(
+        "event=email_template_rendered service=emailservice component=grpc "
+        "action=render_template entity=email reason=send_order_confirmation outcome=success "
+        f"order_id={order.order_id}"
+      )
     except TemplateError as err:
       context.set_details("An error occurred when preparing the confirmation mail.")
       logger.error(err.message)
+      logger.warn(
+        "event=email_send_failed service=emailservice component=grpc "
+        "action=send_order_confirmation entity=email reason=send_order_confirmation outcome=failure"
+      )
       context.set_code(grpc.StatusCode.INTERNAL)
       return demo_pb2.Empty()
 
@@ -102,15 +116,34 @@ class EmailService(BaseEmailService):
     except GoogleAPICallError as err:
       context.set_details("An error occurred when sending the email.")
       print(err.message)
+      logger.warn(
+        "event=email_send_failed service=emailservice component=grpc "
+        "action=send_order_confirmation entity=email reason=send_order_confirmation outcome=failure"
+      )
       context.set_code(grpc.StatusCode.INTERNAL)
       return demo_pb2.Empty()
 
+    logger.info(
+      "event=email_send_succeeded service=emailservice component=grpc "
+      "action=send_order_confirmation entity=email reason=send_order_confirmation outcome=success "
+      f"order_id={order.order_id} email={email}"
+    )
     return demo_pb2.Empty()
 
 class DummyEmailService(BaseEmailService):
   def SendOrderConfirmation(self, request, context):
     set_correlation_from_context(context)
     logger.info('A request to send order confirmation email to {} has been received.'.format(request.email))
+    logger.info(
+      "event=email_send_requested service=emailservice component=grpc "
+      "action=send_order_confirmation entity=email reason=send_order_confirmation outcome=success "
+      f"order_id={request.order.order_id} email={request.email}"
+    )
+    logger.info(
+      "event=email_send_succeeded service=emailservice component=grpc "
+      "action=send_order_confirmation entity=email reason=send_order_confirmation outcome=success "
+      f"order_id={request.order.order_id} email={request.email}"
+    )
     return demo_pb2.Empty()
 
 class HealthCheck():
