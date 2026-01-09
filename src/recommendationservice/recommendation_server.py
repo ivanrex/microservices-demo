@@ -71,9 +71,19 @@ class RecommendationService(demo_pb2_grpc.RecommendationServiceServicer):
     def ListRecommendations(self, request, context):
         set_correlation_from_context(context)
         max_responses = 5
+        logger.info(
+            "event=recommendations_requested service=recommendationservice component=grpc "
+            "action=list_recommendations entity=recommendation reason=list_recommendations outcome=success "
+            f"user_id={request.user_id} product_count={len(request.product_ids)}"
+        )
         # fetch list of products from product catalog stub
         cat_response = product_catalog_stub.ListProducts(demo_pb2.Empty(), metadata=outbound_metadata())
         product_ids = [x.id for x in cat_response.products]
+        logger.info(
+            "event=catalog_query_sent service=recommendationservice component=grpc "
+            "action=list_products entity=product reason=list_recommendations outcome=success "
+            f"product_count={len(product_ids)}"
+        )
         filtered_products = list(set(product_ids)-set(request.product_ids))
         num_products = len(filtered_products)
         num_return = min(max_responses, num_products)
@@ -81,7 +91,17 @@ class RecommendationService(demo_pb2_grpc.RecommendationServiceServicer):
         indices = random.sample(range(num_products), num_return)
         # fetch product ids from indices
         prod_list = [filtered_products[i] for i in indices]
+        if len(prod_list) == 0:
+            logger.info(
+                "event=recommendations_empty service=recommendationservice component=grpc "
+                "action=list_recommendations entity=recommendation reason=list_recommendations outcome=success"
+            )
         logger.info("[Recv ListRecommendations] product_ids={}".format(prod_list))
+        logger.info(
+            "event=recommendations_generated service=recommendationservice component=grpc "
+            "action=list_recommendations entity=recommendation reason=list_recommendations outcome=success "
+            f"recommendation_count={len(prod_list)}"
+        )
         # build and return response
         response = demo_pb2.ListRecommendationsResponse()
         response.product_ids.extend(prod_list)
