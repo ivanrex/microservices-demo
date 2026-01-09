@@ -14,11 +14,16 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import datetime
+import json
+import logging
 import random
 from locust import FastHttpUser, TaskSet, between
 from faker import Faker
-import datetime
 fake = Faker()
+logger = logging.getLogger("loadgenerator")
+if not logger.handlers:
+    logging.basicConfig(level=logging.INFO)
 
 products = [
     '0PUK6V6EV0',
@@ -31,33 +36,58 @@ products = [
     'LS4PSXUNUM',
     'OLJCESPC7Z']
 
+def log_event(event, action, entity, reason, outcome, extra=None):
+    payload = {
+        "event": event,
+        "service": "loadgenerator",
+        "component": "locust",
+        "severity": "INFO",
+        "action": action,
+        "entity": entity,
+        "reason": reason,
+        "outcome": outcome,
+    }
+    if extra:
+        payload.update(extra)
+    logger.info(json.dumps(payload))
+
 def index(l):
+    log_event("checkout_flow_started", "browse_home", "session", "load_generator", "success")
     l.client.get("/")
 
 def setCurrency(l):
     currencies = ['EUR', 'USD', 'JPY', 'CAD', 'GBP', 'TRY']
+    currency = random.choice(currencies)
+    log_event("currency_set", "set_currency", "session", "set_currency", "success", {"currency": currency})
     l.client.post("/setCurrency",
-        {'currency_code': random.choice(currencies)})
+        {'currency_code': currency})
 
 def browseProduct(l):
-    l.client.get("/product/" + random.choice(products))
+    product_id = random.choice(products)
+    log_event("product_browse", "view_product", "product", "browse_product", "success", {"product_id": product_id})
+    l.client.get("/product/" + product_id)
 
 def viewCart(l):
+    log_event("cart_view", "view_cart", "cart", "view_cart", "success")
     l.client.get("/cart")
 
 def addToCart(l):
     product = random.choice(products)
     l.client.get("/product/" + product)
+    log_event("cart_add", "add_to_cart", "cart", "add_to_cart", "success", {"product_id": product})
     l.client.post("/cart", {
         'product_id': product,
         'quantity': random.randint(1,10)})
     
 def empty_cart(l):
+    log_event("cart_empty", "empty_cart", "cart", "empty_cart", "success")
     l.client.post('/cart/empty')
 
 def checkout(l):
+    log_event("checkout_flow_started", "checkout", "order", "checkout", "success")
     addToCart(l)
     current_year = datetime.datetime.now().year+1
+    log_event("place_order", "place_order", "order", "checkout", "success")
     l.client.post("/cart/checkout", {
         'email': fake.email(),
         'street_address': fake.street_address(),
@@ -70,8 +100,10 @@ def checkout(l):
         'credit_card_expiration_year': random.randint(current_year, current_year + 70),
         'credit_card_cvv': f"{random.randint(100, 999)}",
     })
+    log_event("checkout_flow_completed", "checkout", "order", "checkout", "success")
     
 def logout(l):
+    log_event("logout", "logout", "session", "logout", "success")
     l.client.get('/logout')  
 
 
