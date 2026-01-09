@@ -17,6 +17,7 @@ const grpc = require('@grpc/grpc-js');
 const protoLoader = require('@grpc/proto-loader');
 
 const charge = require('./charge');
+const { businessEventLogger } = require('./events');
 
 const logger = require('./logger')
 
@@ -39,12 +40,26 @@ class HipsterShopServer {
    * @param {*} callback  fn(err, ChargeResponse)
    */
   static ChargeServiceHandler(call, callback) {
+    const reqLogger = logger.withRequestContext(call.metadata);
+    const amount = call.request && call.request.amount;
     try {
-      const reqLogger = logger.withRequestContext(call.metadata);
       reqLogger.info(`PaymentService#Charge invoked with request ${JSON.stringify(call.request)}`);
-      const response = charge(call.request);
+      businessEventLogger(reqLogger, 'payment_charge_requested', 'charge_card', 'payment', 'charge', 'success', {
+        amount_currency: amount ? amount.currency_code : undefined,
+        amount_units: amount ? amount.units : undefined
+      }).info('payment charge requested');
+      const response = charge(call.request, reqLogger);
+      businessEventLogger(reqLogger, 'payment_charge_succeeded', 'charge_card', 'payment', 'charge', 'success', {
+        payment_txn_id: response.transaction_id,
+        amount_currency: amount ? amount.currency_code : undefined,
+        amount_units: amount ? amount.units : undefined
+      }).info('payment charge succeeded');
       callback(null, response);
     } catch (err) {
+      businessEventLogger(reqLogger, 'payment_charge_failed', 'charge_card', 'payment', 'charge', 'failure', {
+        amount_currency: amount ? amount.currency_code : undefined,
+        amount_units: amount ? amount.units : undefined
+      }).warn({ err }, 'payment charge failed');
       console.warn(err);
       callback(err);
     }

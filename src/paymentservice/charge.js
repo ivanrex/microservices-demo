@@ -14,17 +14,7 @@
 
 const cardValidator = require('simple-card-validator');
 const { v4: uuidv4 } = require('uuid');
-const pino = require('pino');
-
-const logger = pino({
-  name: 'paymentservice-charge',
-  messageKey: 'message',
-  formatters: {
-    level (logLevelString, logLevelNum) {
-      return { severity: logLevelString }
-    }
-  }
-});
+const baseLogger = require('./logger');
 
 
 class CreditCardError extends Error {
@@ -58,7 +48,8 @@ class ExpiredCreditCard extends CreditCardError {
  * @param {*} request
  * @return transaction_id - a random uuid.
  */
-module.exports = function charge (request) {
+module.exports = function charge (request, logger) {
+  const reqLogger = logger || baseLogger;
   const { amount, credit_card: creditCard } = request;
   const cardNumber = creditCard.credit_card_number;
   const cardInfo = cardValidator(cardNumber);
@@ -79,7 +70,7 @@ module.exports = function charge (request) {
   const { credit_card_expiration_year: year, credit_card_expiration_month: month } = creditCard;
   if ((currentYear * 12 + currentMonth) > (year * 12 + month)) { throw new ExpiredCreditCard(cardNumber.replace('-', ''), month, year); }
 
-  logger.info(`Transaction processed: ${cardType} ending ${cardNumber.substr(-4)} \
+  reqLogger.info(`Transaction processed: ${cardType} ending ${cardNumber.substr(-4)} \
     Amount: ${amount.currency_code}${amount.units}.${amount.nanos}`);
 
   return { transaction_id: uuidv4() };
