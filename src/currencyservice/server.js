@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-const { baseLogger, loggerForCall } = require('./logging');
+const { baseLogger, loggerForCall, businessEventLogger } = require('./logging');
 const logger = baseLogger;
 
 if(process.env.DISABLE_PROFILER) {
@@ -120,7 +120,12 @@ function _carry (amount) {
 function getSupportedCurrencies (call, callback) {
   const reqLogger = loggerForCall(call);
   reqLogger.info('Getting supported currencies...');
+  businessEventLogger(reqLogger, 'currency_list_requested', 'list_currencies', 'currency', 'get_supported_currencies', 'success')
+    .info('currency list requested');
   _getCurrencyData((data) => {
+    businessEventLogger(reqLogger, 'currency_list_returned', 'list_currencies', 'currency', 'get_supported_currencies', 'success', {
+      currency_count: Object.keys(data).length
+    }).info('currency list returned');
     callback(null, {currency_codes: Object.keys(data)});
   });
 }
@@ -133,6 +138,10 @@ function convert (call, callback) {
   try {
     _getCurrencyData((data) => {
       const request = call.request;
+      businessEventLogger(reqLogger, 'currency_convert_requested', 'convert_currency', 'currency', 'convert', 'success', {
+        from_currency: request.from.currency_code,
+        to_currency: request.to_code
+      }).info('currency convert requested');
 
       // Convert: from_currency --> EUR
       const from = request.from;
@@ -154,9 +163,16 @@ function convert (call, callback) {
       result.currency_code = request.to_code;
 
       reqLogger.info(`conversion request successful`);
+      businessEventLogger(reqLogger, 'currency_convert_succeeded', 'convert_currency', 'currency', 'convert', 'success', {
+        from_currency: request.from.currency_code,
+        to_currency: request.to_code
+      }).info('currency convert succeeded');
       callback(null, result);
     });
   } catch (err) {
+    businessEventLogger(reqLogger, 'currency_convert_failed', 'convert_currency', 'currency', 'convert', 'failure', {
+      error: err.message || String(err)
+    }).warn('currency convert failed');
     reqLogger.error(`conversion request failed: ${err}`);
     callback(err.message);
   }

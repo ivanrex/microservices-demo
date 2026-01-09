@@ -30,6 +30,8 @@ const baseLogger = pino({
 const HEADER_REQUEST_ID = 'x-request-id';
 const HEADER_SESSION_ID = 'x-session-id';
 const HEADER_USER_ID = 'x-user-id';
+const SERVICE_NAME = 'currencyservice';
+const COMPONENT_NAME = 'grpc';
 
 function getMetadataValue(metadata, key) {
   if (!metadata || typeof metadata.get !== 'function') {
@@ -57,7 +59,30 @@ function loggerForCall(call) {
   return baseLogger.child(correlationFromMetadata(call && call.metadata));
 }
 
+function businessEventLogger(logger, event, action, entity, reason, outcome, extra) {
+  const fields = {
+    event,
+    service: SERVICE_NAME,
+    component: COMPONENT_NAME,
+    action,
+    entity
+  };
+
+  if (reason) {
+    fields.reason = reason;
+  }
+  if (outcome) {
+    fields.outcome = outcome;
+  }
+  if (extra) {
+    Object.assign(fields, extra);
+  }
+
+  return logger.child(fields);
+}
+
 module.exports = {
   baseLogger,
-  loggerForCall
+  loggerForCall,
+  businessEventLogger
 };
