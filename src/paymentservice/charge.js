@@ -75,8 +75,17 @@ module.exports = function charge (request, logger) {
     card_type: cardType
   }).info('payment validated');
 
-  reqLogger.info(`Transaction processed: ${cardType} ending ${cardNumber.substr(-4)} \
-    Amount: ${amount.currency_code}${amount.units}.${amount.nanos}`);
+  const transactionId = uuidv4();
+  reqLogger.info(
+    {
+      payment_txn_id: transactionId,
+      card_type: cardType,
+      amount_currency: amount.currency_code,
+      amount_units: amount.units,
+      amount_nanos: amount.nanos
+    },
+    `Transaction processed: ${cardType} ending ${cardNumber.substr(-4)} Amount: ${amount.currency_code}${amount.units}.${amount.nanos}`
+  );
 
-  return { transaction_id: uuidv4() };
+  return { transaction_id: transactionId };
 };
