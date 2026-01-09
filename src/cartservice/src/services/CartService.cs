@@ -13,6 +13,7 @@
 // limitations under the License.
 
 using System;
+using System.Collections.Generic;
 using System.Threading.Tasks;
 using Grpc.Core;
 using Microsoft.Extensions.Logging;
@@ -25,27 +26,113 @@ namespace cartservice.services
     {
         private readonly static Empty Empty = new Empty();
         private readonly ICartStore _cartStore;
+        private readonly ILogger<CartService> _logger;
 
-        public CartService(ICartStore cartStore)
+        public CartService(ICartStore cartStore, ILogger<CartService> logger)
         {
             _cartStore = cartStore;
+            _logger = logger;
         }
 
         public async override Task<Empty> AddItem(AddItemRequest request, ServerCallContext context)
         {
-            await _cartStore.AddItemAsync(request.UserId, request.Item.ProductId, request.Item.Quantity);
-            return Empty;
+            var baseFields = new Dictionary<string, object>
+            {
+                ["user_id"] = request.UserId,
+                ["product_id"] = request.Item?.ProductId,
+                ["quantity"] = request.Item?.Quantity
+            };
+
+            using (Logging.BeginBusinessScope(_logger, "cart_item_add_requested", "add_to_cart", "cart", "add_to_cart", "success", baseFields))
+            {
+                _logger.LogInformation("cart add requested");
+            }
+
+            try
+            {
+                await _cartStore.AddItemAsync(request.UserId, request.Item.ProductId, request.Item.Quantity);
+                using (Logging.BeginBusinessScope(_logger, "cart_item_added", "add_to_cart", "cart", "add_to_cart", "success", baseFields))
+                {
+                    _logger.LogInformation("cart item added");
+                }
+                return Empty;
+            }
+            catch (Exception ex)
+            {
+                using (Logging.BeginBusinessScope(_logger, "cart_item_added", "add_to_cart", "cart", "add_to_cart", "failure", baseFields))
+                {
+                    _logger.LogWarning(ex, "cart item add failed");
+                }
+                throw;
+            }
         }
 
         public override Task<Cart> GetCart(GetCartRequest request, ServerCallContext context)
         {
-            return _cartStore.GetCartAsync(request.UserId);
+            var baseFields = new Dictionary<string, object>
+            {
+                ["user_id"] = request.UserId
+            };
+
+            using (Logging.BeginBusinessScope(_logger, "cart_retrieve_requested", "view_cart", "cart", "view_cart", "success", baseFields))
+            {
+                _logger.LogInformation("cart retrieve requested");
+            }
+
+            return GetCartWithLoggingAsync(request, baseFields);
         }
 
         public async override Task<Empty> EmptyCart(EmptyCartRequest request, ServerCallContext context)
         {
-            await _cartStore.EmptyCartAsync(request.UserId);
-            return Empty;
+            var baseFields = new Dictionary<string, object>
+            {
+                ["user_id"] = request.UserId
+            };
+
+            using (Logging.BeginBusinessScope(_logger, "cart_empty_requested", "empty_cart", "cart", "empty_cart", "success", baseFields))
+            {
+                _logger.LogInformation("cart empty requested");
+            }
+
+            try
+            {
+                await _cartStore.EmptyCartAsync(request.UserId);
+                using (Logging.BeginBusinessScope(_logger, "cart_emptied", "empty_cart", "cart", "empty_cart", "success", baseFields))
+                {
+                    _logger.LogInformation("cart emptied");
+                }
+                return Empty;
+            }
+            catch (Exception ex)
+            {
+                using (Logging.BeginBusinessScope(_logger, "cart_emptied", "empty_cart", "cart", "empty_cart", "failure", baseFields))
+                {
+                    _logger.LogWarning(ex, "cart empty failed");
+                }
+                throw;
+            }
+        }
+
+        private async Task<Cart> GetCartWithLoggingAsync(GetCartRequest request, Dictionary<string, object> baseFields)
+        {
+            try
+            {
+                var cart = await _cartStore.GetCartAsync(request.UserId);
+                baseFields["cart_size"] = cart.Items.Count;
+                using (Logging.BeginBusinessScope(_logger, "cart_retrieved", "view_cart", "cart", "view_cart", "success", baseFields))
+                {
+                    _logger.LogInformation("cart retrieved");
+                }
+                return cart;
+            }
+            catch (Exception ex)
+            {
+                using (Logging.BeginBusinessScope(_logger, "cart_retrieved", "view_cart", "cart", "view_cart", "failure", baseFields))
+                {
+                    _logger.LogWarning(ex, "cart retrieve failed");
+                }
+                throw;
+            }
         }
     }
 }
