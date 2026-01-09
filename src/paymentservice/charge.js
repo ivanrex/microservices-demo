@@ -76,8 +76,11 @@ module.exports = function charge (request, logger) {
   }).info('payment validated');
 
   const transactionId = uuidv4();
+  const bindings = typeof reqLogger.bindings === 'function' ? reqLogger.bindings() : {};
   reqLogger.info(
     {
+      request_id: bindings.request_id,
+      user_id: bindings.user_id,
       payment_txn_id: transactionId,
       card_type: cardType,
       amount_currency: amount.currency_code,
