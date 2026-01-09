@@ -28,6 +28,7 @@ import (
 	pb "github.com/GoogleCloudPlatform/microservices-demo/src/productcatalogservice/genproto"
 	"github.com/golang/protobuf/jsonpb"
 	"github.com/jackc/pgx/v5/pgxpool"
+	"github.com/sirupsen/logrus"
 )
 
 func loadCatalog(catalog *pb.ListProductsResponse) error {
@@ -47,15 +48,25 @@ func loadCatalogFromLocalFile(catalog *pb.ListProductsResponse) error {
 	catalogJSON, err := os.ReadFile("products.json")
 	if err != nil {
 		log.Warnf("failed to open product catalog json file: %v", err)
+		businessEventLogger(log, "catalog_loaded", "load_catalog", "catalog", "load_catalog", "failure", logrus.Fields{
+			"source": "local_file",
+		}).WithField("error", err).Warn("catalog load failed")
 		return err
 	}
 
 	if err := jsonpb.Unmarshal(bytes.NewReader(catalogJSON), catalog); err != nil {
 		log.Warnf("failed to parse the catalog JSON: %v", err)
+		businessEventLogger(log, "catalog_loaded", "load_catalog", "catalog", "load_catalog", "failure", logrus.Fields{
+			"source": "local_file",
+		}).WithField("error", err).Warn("catalog load failed")
 		return err
 	}
 
 	log.Info("successfully parsed product catalog json")
+	businessEventLogger(log, "catalog_loaded", "load_catalog", "catalog", "load_catalog", "success", logrus.Fields{
+		"source":        "local_file",
+		"product_count": len(catalog.Products),
+	}).Info("catalog loaded")
 	return nil
 }
 
@@ -95,12 +106,18 @@ func loadCatalogFromAlloyDB(catalog *pb.ListProductsResponse) error {
 
 	pgPassword, err := getSecretPayload(projectID, pgSecretName, "latest")
 	if err != nil {
+		businessEventLogger(log, "catalog_loaded", "load_catalog", "catalog", "load_catalog", "failure", logrus.Fields{
+			"source": "alloydb",
+		}).WithField("error", err).Warn("catalog load failed")
 		return err
 	}
 
 	dialer, err := alloydbconn.NewDialer(context.Background())
 	if err != nil {
 		log.Warnf("failed to set-up dialer connection: %v", err)
+		businessEventLogger(log, "catalog_loaded", "load_catalog", "catalog", "load_catalog", "failure", logrus.Fields{
+			"source": "alloydb",
+		}).WithField("error", err).Warn("catalog load failed")
 		return err
 	}
 	cleanup := func() error { return dialer.Close() }
@@ -114,6 +131,9 @@ func loadCatalogFromAlloyDB(catalog *pb.ListProductsResponse) error {
 	config, err := pgxpool.ParseConfig(dsn)
 	if err != nil {
 		log.Warnf("failed to parse DSN config: %v", err)
+		businessEventLogger(log, "catalog_loaded", "load_catalog", "catalog", "load_catalog", "failure", logrus.Fields{
+			"source": "alloydb",
+		}).WithField("error", err).Warn("catalog load failed")
 		return err
 	}
 
@@ -125,6 +145,9 @@ func loadCatalogFromAlloyDB(catalog *pb.ListProductsResponse) error {
 	pool, err := pgxpool.NewWithConfig(context.Background(), config)
 	if err != nil {
 		log.Warnf("failed to set-up pgx pool: %v", err)
+		businessEventLogger(log, "catalog_loaded", "load_catalog", "catalog", "load_catalog", "failure", logrus.Fields{
+			"source": "alloydb",
+		}).WithField("error", err).Warn("catalog load failed")
 		return err
 	}
 	defer pool.Close()
@@ -133,6 +156,9 @@ func loadCatalogFromAlloyDB(catalog *pb.ListProductsResponse) error {
 	rows, err := pool.Query(context.Background(), query)
 	if err != nil {
 		log.Warnf("failed to query database: %v", err)
+		businessEventLogger(log, "catalog_loaded", "load_catalog", "catalog", "load_catalog", "failure", logrus.Fields{
+			"source": "alloydb",
+		}).WithField("error", err).Warn("catalog load failed")
 		return err
 	}
 	defer rows.Close()
@@ -148,6 +174,9 @@ func loadCatalogFromAlloyDB(catalog *pb.ListProductsResponse) error {
 			&product.PriceUsd.Nanos, &categories)
 		if err != nil {
 			log.Warnf("failed to scan query result row: %v", err)
+			businessEventLogger(log, "catalog_loaded", "load_catalog", "catalog", "load_catalog", "failure", logrus.Fields{
+				"source": "alloydb",
+			}).WithField("error", err).Warn("catalog load failed")
 			return err
 		}
 		categories = strings.ToLower(categories)
@@ -157,5 +186,9 @@ func loadCatalogFromAlloyDB(catalog *pb.ListProductsResponse) error {
 	}
 
 	log.Info("successfully parsed product catalog from AlloyDB")
+	businessEventLogger(log, "catalog_loaded", "load_catalog", "catalog", "load_catalog", "success", logrus.Fields{
+		"source":        "alloydb",
+		"product_count": len(catalog.Products),
+	}).Info("catalog loaded")
 	return nil
 }

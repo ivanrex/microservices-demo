@@ -20,6 +20,7 @@ import (
 	"time"
 
 	pb "github.com/GoogleCloudPlatform/microservices-demo/src/productcatalogservice/genproto"
+	"github.com/sirupsen/logrus"
 	"google.golang.org/grpc/codes"
 	healthpb "google.golang.org/grpc/health/grpc_health_v1"
 	"google.golang.org/grpc/status"
@@ -38,14 +39,26 @@ func (p *productCatalog) Watch(req *healthpb.HealthCheckRequest, ws healthpb.Hea
 	return status.Errorf(codes.Unimplemented, "health check via Watch not implemented")
 }
 
-func (p *productCatalog) ListProducts(context.Context, *pb.Empty) (*pb.ListProductsResponse, error) {
+func (p *productCatalog) ListProducts(ctx context.Context, _ *pb.Empty) (*pb.ListProductsResponse, error) {
 	time.Sleep(extraLatency)
 
-	return &pb.ListProductsResponse{Products: p.parseCatalog()}, nil
+	reqLog := logForRequest(ctx)
+	businessEventLogger(reqLog, "product_list_requested", "list_products", "product", "list_products", "success", nil).
+		Info("product list requested")
+	resp := &pb.ListProductsResponse{Products: p.parseCatalog()}
+	businessEventLogger(reqLog, "product_list_returned", "list_products", "product", "list_products", "success", logrus.Fields{
+		"product_count": len(resp.Products),
+	}).Info("product list returned")
+	return resp, nil
 }
 
 func (p *productCatalog) GetProduct(ctx context.Context, req *pb.GetProductRequest) (*pb.Product, error) {
 	time.Sleep(extraLatency)
+
+	reqLog := logForRequest(ctx)
+	businessEventLogger(reqLog, "product_get_requested", "get_product", "product", "get_product", "success", logrus.Fields{
+		"product_id": req.Id,
+	}).Info("product get requested")
 
 	var found *pb.Product
 	for i := 0; i < len(p.parseCatalog()); i++ {
@@ -55,13 +68,24 @@ func (p *productCatalog) GetProduct(ctx context.Context, req *pb.GetProductReque
 	}
 
 	if found == nil {
+		businessEventLogger(reqLog, "product_get_failed", "get_product", "product", "get_product", "failure", logrus.Fields{
+			"product_id": req.Id,
+		}).Warn("product get failed")
 		return nil, status.Errorf(codes.NotFound, "no product with ID %s", req.Id)
 	}
+	businessEventLogger(reqLog, "product_get_returned", "get_product", "product", "get_product", "success", logrus.Fields{
+		"product_id": req.Id,
+	}).Info("product get returned")
 	return found, nil
 }
 
 func (p *productCatalog) SearchProducts(ctx context.Context, req *pb.SearchProductsRequest) (*pb.SearchProductsResponse, error) {
 	time.Sleep(extraLatency)
+
+	reqLog := logForRequest(ctx)
+	businessEventLogger(reqLog, "product_search_requested", "search_products", "product", "search_products", "success", logrus.Fields{
+		"query": req.Query,
+	}).Info("product search requested")
 
 	var ps []*pb.Product
 	for _, product := range p.parseCatalog() {
@@ -71,11 +95,19 @@ func (p *productCatalog) SearchProducts(ctx context.Context, req *pb.SearchProdu
 		}
 	}
 
-	return &pb.SearchProductsResponse{Results: ps}, nil
+	resp := &pb.SearchProductsResponse{Results: ps}
+	businessEventLogger(reqLog, "product_search_returned", "search_products", "product", "search_products", "success", logrus.Fields{
+		"result_count": len(resp.Results),
+		"query":        req.Query,
+	}).Info("product search returned")
+	return resp, nil
 }
 
 func (p *productCatalog) parseCatalog() []*pb.Product {
 	if reloadCatalog || len(p.catalog.Products) == 0 {
+		businessEventLogger(log, "catalog_reload_triggered", "load_catalog", "catalog", "load_catalog", "success", logrus.Fields{
+			"reload": reloadCatalog,
+		}).Info("catalog reload triggered")
 		err := loadCatalog(&p.catalog)
 		if err != nil {
 			return []*pb.Product{}
