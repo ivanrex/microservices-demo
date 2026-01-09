@@ -129,12 +129,22 @@ func (s *server) GetQuote(ctx context.Context, in *pb.GetQuoteRequest) (*pb.GetQ
 	quote := CreateQuoteFromCount(0)
 
 	// 2. Generate a response.
-	return &pb.GetQuoteResponse{
+	resp := &pb.GetQuoteResponse{
 		CostUsd: &pb.Money{
 			CurrencyCode: "USD",
 			Units:        int64(quote.Dollars),
 			Nanos:        int32(quote.Cents * 10000000)},
-	}, nil
+	}
+	businessEventLogger(reqLog, "shipping_quote_requested", "get_quote", "shipment", "get_quote", "success", logrus.Fields{
+		"items_count": len(in.Items),
+	}).Info("shipping quote requested")
+	businessEventLogger(reqLog, "shipping_quote_returned", "get_quote", "shipment", "get_quote", "success", logrus.Fields{
+		"items_count":   len(in.Items),
+		"amount_units":  resp.CostUsd.Units,
+		"amount_nanos":  resp.CostUsd.Nanos,
+		"currency_code": resp.CostUsd.CurrencyCode,
+	}).Info("shipping quote returned")
+	return resp, nil
 
 }
 
@@ -149,9 +159,17 @@ func (s *server) ShipOrder(ctx context.Context, in *pb.ShipOrderRequest) (*pb.Sh
 	id := CreateTrackingId(baseAddress)
 
 	// 2. Generate a response.
-	return &pb.ShipOrderResponse{
+	resp := &pb.ShipOrderResponse{
 		TrackingId: id,
-	}, nil
+	}
+	businessEventLogger(reqLog, "ship_order_requested", "ship_order", "shipment", "ship_order", "success", logrus.Fields{
+		"items_count": len(in.Items),
+	}).Info("ship order requested")
+	businessEventLogger(reqLog, "shipment_created", "ship_order", "shipment", "ship_order", "success", logrus.Fields{
+		"tracking_id": resp.TrackingId,
+		"items_count": len(in.Items),
+	}).Info("shipment created")
+	return resp, nil
 }
 
 func initStats() {
