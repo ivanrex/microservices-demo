@@ -61,3 +61,62 @@ All services should emit logs with these common keys whenever possible:
   "outcome": "success"
 }
 ```
+
+### Checkout flow (end-to-end)
+```json
+{
+  "event": "place_order",
+  "service": "frontend",
+  "component": "http",
+  "request_id": "9f6c1c02-45ab-4a8f-9b7a-9b71d9f4a7b0",
+  "session_id": "12345678-1234-1234-1234-123456789123",
+  "action": "place_order",
+  "entity": "order",
+  "outcome": "success"
+}
+```
+```json
+{
+  "event": "place_order_received",
+  "service": "checkoutservice",
+  "component": "grpc",
+  "request_id": "9f6c1c02-45ab-4a8f-9b7a-9b71d9f4a7b0",
+  "action": "place_order",
+  "entity": "order",
+  "outcome": "success"
+}
+```
+```json
+{
+  "event": "payment_charge_succeeded",
+  "service": "paymentservice",
+  "component": "grpc",
+  "request_id": "9f6c1c02-45ab-4a8f-9b7a-9b71d9f4a7b0",
+  "action": "charge_card",
+  "entity": "payment",
+  "payment_txn_id": "a9c2f4e7-2f7d-4a55-9d1c-8b9c5f6a0e8a",
+  "outcome": "success"
+}
+```
+```json
+{
+  "event": "shipment_created",
+  "service": "shippingservice",
+  "component": "grpc",
+  "request_id": "9f6c1c02-45ab-4a8f-9b7a-9b71d9f4a7b0",
+  "action": "ship_order",
+  "entity": "shipment",
+  "outcome": "success"
+}
+```
+```json
+{
+  "event": "confirmation_email_sent",
+  "service": "emailservice",
+  "component": "grpc",
+  "request_id": "9f6c1c02-45ab-4a8f-9b7a-9b71d9f4a7b0",
+  "action": "send_order_confirmation_email",
+  "entity": "order",
+  "outcome": "success"
+}
+```
