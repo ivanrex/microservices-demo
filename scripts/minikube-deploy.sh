@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+# ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/../microservices-demo" && pwd)"
+ROOT_DIR="${HOME}/microservices-demo"
 MANIFEST="${ROOT_DIR}/release/kubernetes-manifests.yaml"
 
 IMAGE_TAG="${IMAGE_TAG:-$(date +%Y%m%d.%H%M%S)}"
@@ -26,6 +27,7 @@ eval "$(minikube -p minikube docker-env)"
 
 for svc in "${SERVICES[@]}"; do
   svc_dir="${ROOT_DIR}/src/${svc}"
+  echo $svc_dir
   if [[ -f "${svc_dir}/Dockerfile" ]]; then
     echo "Building ${svc}:${IMAGE_TAG}"
     docker build -t "${svc}:${IMAGE_TAG}" "${svc_dir}"
@@ -41,7 +43,8 @@ import re
 manifest = Path("${MANIFEST}")
 text = manifest.read_text()
 
-services = ${SERVICES!r}
+
+services = "${SERVICES[@]}".split()
 tag = "${IMAGE_TAG}"
 
 def replace_image_line(line):
@@ -62,5 +65,6 @@ manifest.write_text("\\n".join(out_lines) + "\\n")
 print(f"Updated {manifest} images to tag {tag}")
 PY
 
-kubectl apply -f "${MANIFEST}"
-echo "Applied ${MANIFEST}"
+# kubectl apply -f "${MANIFEST}"
+# echo "Applied ${MANIFEST}"
+echo "MANIFEST update complete."
