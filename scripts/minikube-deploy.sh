@@ -27,6 +27,9 @@ eval "$(minikube -p minikube docker-env)"
 
 for svc in "${SERVICES[@]}"; do
   svc_dir="${ROOT_DIR}/src/${svc}"
+  if [[ "${svc}" == "cartservice" ]]; then
+    svc_dir="${ROOT_DIR}/src/${svc}/src"
+  fi
   echo $svc_dir
   if [[ -f "${svc_dir}/Dockerfile" ]]; then
     echo "Building ${svc}:${IMAGE_TAG}"
@@ -68,3 +71,4 @@ PY
 # kubectl apply -f "${MANIFEST}"
 # echo "Applied ${MANIFEST}"
 echo "MANIFEST update complete."
+# kubectl apply -f /home/yifan/microservices-demo/release/kubernetes-manifests.yaml
