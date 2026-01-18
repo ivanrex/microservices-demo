@@ -6,6 +6,15 @@ ROOT_DIR="${HOME}/microservices-demo"
 MANIFEST="${ROOT_DIR}/release/kubernetes-manifests.yaml"
 
 IMAGE_TAG="${IMAGE_TAG:-$(date +%Y%m%d.%H%M%S)}"
+APPLY=true
+
+for arg in "$@"; do
+  case "$arg" in
+    --no-apply)
+      APPLY=false
+      ;;
+  esac
+done
 
 SERVICES=(
   adservice
@@ -68,7 +77,9 @@ manifest.write_text("\\n".join(out_lines) + "\\n")
 print(f"Updated {manifest} images to tag {tag}")
 PY
 
-# kubectl apply -f "${MANIFEST}"
-# echo "Applied ${MANIFEST}"
 echo "MANIFEST update complete."
-# kubectl apply -f /home/yifan/microservices-demo/release/kubernetes-manifests.yaml
+if [ "${APPLY}" = true ]; then
+  kubectl apply -f "${MANIFEST}"
+else
+  echo "Skipping kubectl apply (--no-apply)"
+fi
