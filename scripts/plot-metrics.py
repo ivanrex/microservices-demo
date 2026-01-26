@@ -3,6 +3,8 @@ import csv
 import sys
 from pathlib import Path
 
+# Usage example: ./scripts/plot-metrics.py [metrics_directory]
+
 try:
     import matplotlib.pyplot as plt
 except ImportError:  # pragma: no cover - runtime check
@@ -11,7 +13,7 @@ except ImportError:  # pragma: no cover - runtime check
 
 
 ROOT_DIR = Path(__file__).resolve().parents[1]
-METRICS_DIR = ROOT_DIR / "sample_data" / "metrics"
+DEFAULT_METRICS_DIR = ROOT_DIR / "sample_data" / "metrics"
 MAX_SERIES = 10
 
 
@@ -167,12 +169,13 @@ def plot_combined(metrics_dir, plot_paths):
 
 
 def main():
-    if not METRICS_DIR.exists():
-        print(f"Metrics directory not found: {METRICS_DIR}")
+    metrics_dir = Path(sys.argv[1]).expanduser() if len(sys.argv) > 1 else DEFAULT_METRICS_DIR
+    if not metrics_dir.exists():
+        print(f"Metrics directory not found: {metrics_dir}")
         return 1
 
-    plot_paths = plot_all_metrics(METRICS_DIR)
-    plot_combined(METRICS_DIR, plot_paths)
+    plot_paths = plot_all_metrics(metrics_dir)
+    plot_combined(metrics_dir, plot_paths)
     return 0
 
 
